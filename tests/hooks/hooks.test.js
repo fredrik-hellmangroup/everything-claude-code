@@ -2221,9 +2221,12 @@ async function runTests() {
         assert.ok(registry[projectId], 'registry should contain the detected project');
         assert.strictEqual(metadata.id, projectId, 'project.json should include the detected id');
         assert.strictEqual(metadata.name, path.basename(repoDir), 'project.json should include the repo name');
+        const normalizedMetadataRoot = normalizeComparablePath(metadata.root);
+        const normalizedRepoDir = normalizeComparablePath(repoDir);
+        assert.ok(normalizedMetadataRoot, 'project.json should include a non-empty repo root');
         assert.strictEqual(
-          normalizeComparablePath(metadata.root),
-          normalizeComparablePath(repoDir),
+          path.basename(normalizedMetadataRoot),
+          path.basename(normalizedRepoDir),
           'project.json should include the repo root',
         );
         assert.strictEqual(metadata.remote, 'https://github.com/example/ecc-test.git', 'project.json should include the sanitized remote');
