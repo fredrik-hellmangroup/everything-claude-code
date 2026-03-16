@@ -1,11 +1,17 @@
 const { execFileSync, spawnSync } = require('child_process');
 
+/**
+ * Returns the preferred PowerShell executable candidates for a platform.
+ */
 function getPowerShellCandidates(platform = process.platform) {
   return platform === 'win32'
     ? ['pwsh', 'pwsh.exe', 'powershell.exe']
     : ['pwsh'];
 }
 
+/**
+ * Resolves the first PowerShell candidate that can execute successfully.
+ */
 function resolvePowerShellCommand(platform = process.platform, spawn = spawnSync) {
   const candidates = getPowerShellCandidates(platform);
 
@@ -28,6 +34,9 @@ function resolvePowerShellCommand(platform = process.platform, spawn = spawnSync
   return null;
 }
 
+/**
+ * Resolves an executable's absolute path using the platform locator command.
+ */
 function resolveExecutablePath(command, platform = process.platform, execFile = execFileSync) {
   const locator = platform === 'win32' ? 'where.exe' : 'which';
 

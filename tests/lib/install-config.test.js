@@ -12,6 +12,9 @@ const {
   resolveInstallConfigPath,
 } = require('../../scripts/lib/install/config');
 
+/**
+ * Runs a synchronous assertion-based test and records the outcome.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -24,19 +27,31 @@ function test(name, fn) {
   }
 }
 
+/**
+ * Creates an isolated temporary directory for a test case.
+ */
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+/**
+ * Removes a temporary directory tree created for a test case.
+ */
 function cleanup(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
 }
 
+/**
+ * Writes a JSON fixture file, creating parent directories as needed.
+ */
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
+/**
+ * Executes the install config regression suite.
+ */
 function runTests() {
   console.log('\n=== Testing install/config.js ===\n');
 

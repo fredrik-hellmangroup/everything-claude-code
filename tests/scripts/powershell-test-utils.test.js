@@ -10,6 +10,9 @@ const {
   resolvePowerShellCommand,
 } = require('./powershell-test-utils');
 
+/**
+ * Runs a synchronous test case and prints a small TAP-like result line.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -22,6 +25,9 @@ function test(name, fn) {
   }
 }
 
+/**
+ * Executes the PowerShell utility regression suite.
+ */
 function runTests() {
   console.log('\n=== Testing powershell-test-utils.js ===\n');
 

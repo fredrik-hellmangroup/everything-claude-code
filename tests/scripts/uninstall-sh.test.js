@@ -11,22 +11,33 @@ const { execFileSync } = require('child_process');
 const INSTALL_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'install-apply.js');
 const SCRIPT = path.join(__dirname, '..', '..', 'uninstall.sh');
 
+/**
+ * Creates an isolated temporary directory for a shell wrapper test.
+ */
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+/**
+ * Removes a temporary directory tree created by a test.
+ */
 function cleanup(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
 }
 
+/**
+ * Runs the shell uninstaller wrapper and captures its exit status.
+ */
 function run(args = [], options = {}) {
   const env = {
     ...process.env,
     HOME: options.homeDir || process.env.HOME,
+    ...options.env,
   };
+  const scriptPath = options.scriptPath || SCRIPT;
 
   try {
-    const stdout = execFileSync('bash', [SCRIPT, ...args], {
+    const stdout = execFileSync('bash', [scriptPath, ...args], {
       cwd: options.cwd,
       env,
       encoding: 'utf8',
@@ -44,6 +55,9 @@ function run(args = [], options = {}) {
   }
 }
 
+/**
+ * Runs a synchronous assertion-based test and prints the result.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -56,6 +70,9 @@ function test(name, fn) {
   }
 }
 
+/**
+ * Executes the uninstall.sh wrapper regression suite.
+ */
 function runTests() {
   console.log('\n=== Testing uninstall.sh ===\n');
 
@@ -98,6 +115,85 @@ function runTests() {
       assert.strictEqual(parsed.summary.plannedRemovalCount, 1);
       assert.ok(fs.existsSync(statePath));
     } finally {
+      cleanup(homeDir);
+      cleanup(projectDir);
+    }
+  })) passed++; else failed++;
+
+  if (test('surfaces a friendly error when Node.js is not available in PATH', () => {
+    const emptyPathDir = createTempDir('uninstall-sh-path-');
+    const homeDir = createTempDir('uninstall-sh-home-');
+    const projectDir = createTempDir('uninstall-sh-project-');
+
+    try {
+      const result = run(['--dry-run'], {
+        cwd: projectDir,
+        homeDir,
+        env: {
+          PATH: emptyPathDir,
+        },
+      });
+
+      assert.strictEqual(result.code, 1);
+      assert.ok(result.stderr.includes('Node.js was not found in PATH. Please install Node.js and try again.'));
+    } finally {
+      cleanup(emptyPathDir);
+      cleanup(homeDir);
+      cleanup(projectDir);
+    }
+  })) passed++; else failed++;
+
+  if (test('surfaces a friendly error when the uninstaller runtime script is missing', () => {
+    const wrapperDir = createTempDir('uninstall-sh-wrapper-');
+    const homeDir = createTempDir('uninstall-sh-home-');
+    const projectDir = createTempDir('uninstall-sh-project-');
+    const wrapperScript = path.join(wrapperDir, 'uninstall.sh');
+
+    try {
+      fs.copyFileSync(SCRIPT, wrapperScript);
+
+      const result = run(['--dry-run'], {
+        cwd: projectDir,
+        homeDir,
+        scriptPath: wrapperScript,
+      });
+
+      assert.strictEqual(result.code, 1);
+      assert.ok(result.stderr.includes(`Uninstaller script not found: ${path.join(wrapperDir, 'scripts', 'uninstall.js')}`));
+    } finally {
+      cleanup(wrapperDir);
+      cleanup(homeDir);
+      cleanup(projectDir);
+    }
+  })) passed++; else failed++;
+
+  if (test('fails with a clear error when symlink resolution exceeds the depth limit', () => {
+    const wrapperDir = createTempDir('uninstall-sh-links-');
+    const homeDir = createTempDir('uninstall-sh-home-');
+    const projectDir = createTempDir('uninstall-sh-project-');
+    const targetScript = path.join(wrapperDir, 'target-uninstall.sh');
+    const firstLink = path.join(wrapperDir, 'link-0.sh');
+
+    try {
+      fs.copyFileSync(SCRIPT, targetScript);
+
+      let previousPath = targetScript;
+      for (let index = 32; index >= 0; index -= 1) {
+        const linkPath = path.join(wrapperDir, `link-${index}.sh`);
+        fs.symlinkSync(previousPath, linkPath);
+        previousPath = linkPath;
+      }
+
+      const result = run(['--dry-run'], {
+        cwd: projectDir,
+        homeDir,
+        scriptPath: firstLink,
+      });
+
+      assert.strictEqual(result.code, 1);
+      assert.ok(result.stderr.includes('Exceeded symlink resolution depth limit (32) while resolving script path:'));
+    } finally {
+      cleanup(wrapperDir);
       cleanup(homeDir);
       cleanup(projectDir);
     }

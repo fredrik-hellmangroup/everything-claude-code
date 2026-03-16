@@ -22,20 +22,32 @@ const {
   writeInstallState,
 } = require('../../scripts/lib/install-state');
 
+/**
+ * Creates an isolated temporary directory for an uninstall integration test.
+ */
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+/**
+ * Removes a temporary directory tree created by a test.
+ */
 function cleanup(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
 }
 
+/**
+ * Writes a normalized install state fixture and returns the in-memory state.
+ */
 function writeState(filePath, options) {
   const state = createInstallState(options);
   writeInstallState(filePath, state);
   return state;
 }
 
+/**
+ * Runs the Node uninstaller entrypoint and captures its exit status.
+ */
 function run(args = [], options = {}) {
   const env = {
     ...process.env,
@@ -61,6 +73,9 @@ function run(args = [], options = {}) {
   }
 }
 
+/**
+ * Runs a synchronous assertion-based test and prints the result.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -73,6 +88,9 @@ function test(name, fn) {
   }
 }
 
+/**
+ * Executes the uninstall.js regression suite.
+ */
 function runTests() {
   console.log('\n=== Testing uninstall.js ===\n');
 

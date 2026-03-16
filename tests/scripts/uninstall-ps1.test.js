@@ -14,14 +14,23 @@ const INSTALL_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'install-appl
 const SCRIPT = path.join(__dirname, '..', '..', 'uninstall.ps1');
 const PACKAGE_JSON = path.join(__dirname, '..', '..', 'package.json');
 
+/**
+ * Creates an isolated temporary directory for a PowerShell wrapper test.
+ */
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+/**
+ * Removes a temporary directory tree created by a test.
+ */
 function cleanup(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
 }
 
+/**
+ * Runs the PowerShell uninstaller wrapper and captures its exit status.
+ */
 function run(powerShellCommand, args = [], options = {}) {
   const env = {
     ...process.env,
@@ -51,6 +60,9 @@ function run(powerShellCommand, args = [], options = {}) {
   }
 }
 
+/**
+ * Runs a synchronous assertion-based test and prints the result.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -63,6 +75,9 @@ function test(name, fn) {
   }
 }
 
+/**
+ * Executes the uninstall.ps1 wrapper regression suite.
+ */
 function runTests() {
   console.log('\n=== Testing uninstall.ps1 ===\n');
 

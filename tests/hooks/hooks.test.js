@@ -10,6 +10,9 @@ const fs = require('fs');
 const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 
+/**
+ * Converts Windows paths into the Bash-compatible form expected by hook scripts.
+ */
 function toBashPath(filePath, platform = process.platform, env = process.env) {
   if (platform !== 'win32') {
     return filePath;
@@ -24,11 +27,104 @@ function toBashPath(filePath, platform = process.platform, env = process.env) {
     .replace(/\\/g, '/');
 }
 
+/**
+ * Converts Bash-style Windows mount paths back into native Windows paths.
+ */
+function toNativePath(filePath, platform = process.platform) {
+  if (platform !== 'win32') {
+    return filePath;
+  }
+
+  const normalized = String(filePath);
+  const mountMatch = normalized.match(/^\/mnt\/([A-Za-z])\/(.*)$/);
+  if (mountMatch) {
+    return `${mountMatch[1].toUpperCase()}:\\${mountMatch[2].replace(/\//g, '\\')}`;
+  }
+
+  const cygdriveMatch = normalized.match(/^\/cygdrive\/([A-Za-z])\/(.*)$/);
+  if (cygdriveMatch) {
+    return `${cygdriveMatch[1].toUpperCase()}:\\${cygdriveMatch[2].replace(/\//g, '\\')}`;
+  }
+
+  const msysMatch = normalized.match(/^\/([A-Za-z])\/(.*)$/);
+  if (msysMatch) {
+    return `${msysMatch[1].toUpperCase()}:\\${msysMatch[2].replace(/\//g, '\\')}`;
+  }
+
+  return normalized;
+}
+
+/**
+ * Normalizes Windows path-like environment variables for Bash-based tests.
+ */
+function toBashEnv(env = process.env, platform = process.platform) {
+  const nextEnv = { ...env };
+
+  if (platform !== 'win32') {
+    return nextEnv;
+  }
+
+  const pathKeys = ['HOME', 'USERPROFILE', 'TMP', 'TEMP', 'TMPDIR', 'CLAUDE_PROJECT_DIR'];
+  const isWsl = Boolean(env.WSLENV || env.WSL_DISTRO_NAME);
+
+  if (isWsl) {
+    const existingEntries = String(nextEnv.WSLENV || '')
+      .split(':')
+      .filter(Boolean)
+      .filter(entry => !pathKeys.some(key => entry === key || entry.startsWith(`${key}/`)));
+
+    for (const key of pathKeys) {
+      existingEntries.push(`${key}/p`);
+    }
+
+    nextEnv.WSLENV = [...new Set(existingEntries)].join(':');
+    return nextEnv;
+  }
+
+  for (const key of pathKeys) {
+    const value = nextEnv[key];
+    if (typeof value === 'string' && /^[A-Za-z]:\\/.test(value)) {
+      nextEnv[key] = toBashPath(value, platform, env);
+    }
+  }
+
+  return nextEnv;
+}
+
+/**
+ * Quotes a string for safe inclusion in a Bash command line.
+ */
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'"'"'`)}'`;
+}
+
+/**
+ * Builds Bash export commands for test-specific environment overrides.
+ */
+function buildBashExports(envOverrides = {}, platform = process.platform, env = process.env) {
+  const pathLikeKeys = new Set(['HOME', 'USERPROFILE', 'TMP', 'TEMP', 'TMPDIR', 'CLAUDE_PROJECT_DIR', 'CLV2_HOMUNCULUS_DIR']);
+
+  return Object.entries(envOverrides).map(([key, rawValue]) => {
+    let value = rawValue;
+
+    if (platform === 'win32' && pathLikeKeys.has(key) && typeof rawValue === 'string' && /^[A-Za-z]:\\/.test(rawValue)) {
+      value = toBashPath(rawValue, platform, env);
+    }
+
+    return `export ${key}=${shellQuote(value)}`;
+  });
+}
+
+/**
+ * Blocks synchronously for the requested number of milliseconds.
+ */
 function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-// Test helper
+/**
+ * Runs a synchronous assertion-based test and prints the result.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -41,7 +137,9 @@ function test(name, fn) {
   }
 }
 
-// Async test helper
+/**
+ * Runs an asynchronous assertion-based test and prints the result.
+ */
 async function asyncTest(name, fn) {
   try {
     await fn();
@@ -54,7 +152,9 @@ async function asyncTest(name, fn) {
   }
 }
 
-// Run a script and capture output
+/**
+ * Runs a Node.js script with optional stdin input and environment overrides.
+ */
 function runScript(scriptPath, input = '', env = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn('node', [scriptPath], {
@@ -81,13 +181,26 @@ function runScript(scriptPath, input = '', env = {}) {
   });
 }
 
+/**
+ * Runs a shell script with optional args, stdin input, env overrides, and cwd.
+ */
 function runShellScript(scriptPath, args = [], input = '', env = {}, cwd = process.cwd()) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('bash', [toBashPath(scriptPath), ...args], {
-      cwd,
-      env: { ...process.env, ...env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const isWsl = process.platform === 'win32' && Boolean(process.env.WSLENV || process.env.WSL_DISTRO_NAME);
+    const proc = isWsl
+      ? spawn('bash', ['-lc', [
+          ...buildBashExports(env),
+          `cd ${shellQuote(toBashPath(cwd, process.platform, process.env))}`,
+          `${shellQuote(toBashPath(scriptPath, process.platform, process.env))}${args.length > 0 ? ` ${args.map(shellQuote).join(' ')}` : ''}`
+        ].join('; ')], {
+          env: process.env,
+          stdio: ['pipe', 'pipe', 'pipe']
+        })
+      : spawn('bash', [toBashPath(scriptPath), ...args], {
+          cwd,
+          env: toBashEnv({ ...process.env, ...env }),
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
 
     let stdout = '';
     let stderr = '';
@@ -104,12 +217,16 @@ function runShellScript(scriptPath, args = [], input = '', env = {}, cwd = proce
   });
 }
 
-// Create a temporary test directory
+/**
+ * Creates a temporary directory for hook test fixtures.
+ */
 function createTestDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'hooks-test-'));
 }
 
-// Clean up test directory
+/**
+ * Removes a temporary directory tree created for a hook test.
+ */
 function cleanupTestDir(testDir) {
   const retryableCodes = new Set(['EPERM', 'EBUSY', 'ENOTEMPTY']);
 
@@ -126,6 +243,9 @@ function cleanupTestDir(testDir) {
   }
 }
 
+/**
+ * Creates a shim command that logs invocations and exits successfully.
+ */
 function createCommandShim(binDir, baseName, logFile) {
   fs.mkdirSync(binDir, { recursive: true });
 
@@ -149,6 +269,9 @@ function createCommandShim(binDir, baseName, logFile) {
   return shimPath;
 }
 
+/**
+ * Reads structured invocation records from a command shim log.
+ */
 function readCommandLog(logFile) {
   if (!fs.existsSync(logFile)) return [];
   return fs
@@ -165,6 +288,9 @@ function readCommandLog(logFile) {
     .filter(Boolean);
 }
 
+/**
+ * Prepends a directory to PATH while preserving the provided environment.
+ */
 function withPrependedPath(binDir, env = {}) {
   const pathKey = Object.keys(process.env).find(key => key.toLowerCase() === 'path') || (process.platform === 'win32' ? 'Path' : 'PATH');
   const currentPath = process.env[pathKey] || process.env.PATH || '';
@@ -177,6 +303,9 @@ function withPrependedPath(binDir, env = {}) {
   };
 }
 
+/**
+ * Verifies that a skipped code path did not create project-detection side effects.
+ */
 function assertNoProjectDetectionSideEffects(homeDir, testName) {
   const homunculusDir = path.join(homeDir, '.claude', 'homunculus');
   const registryPath = path.join(homunculusDir, 'projects.json');
@@ -190,6 +319,9 @@ function assertNoProjectDetectionSideEffects(homeDir, testName) {
   assert.strictEqual(projectEntries.length, 0, `${testName} should not create project directories`);
 }
 
+/**
+ * Asserts that observe.sh exits before any project-detection side effects occur.
+ */
 async function assertObserveSkipBeforeProjectDetection(testCase) {
   const observePath = path.join(__dirname, '..', '..', 'skills', 'continuous-learning-v2', 'hooks', 'observe.sh');
   const homeDir = createTestDir();
@@ -222,6 +354,9 @@ async function assertObserveSkipBeforeProjectDetection(testCase) {
   }
 }
 
+/**
+ * Executes a patched temporary copy of tests/run-all.js from the provided root.
+ */
 function runPatchedRunAll(tempRoot) {
   const wrapperPath = path.join(tempRoot, 'run-all-wrapper.js');
   const tempTestsDir = path.join(tempRoot, 'tests');
@@ -266,6 +401,17 @@ async function runTests() {
     test('toBashPath uses WSL /mnt drive mounts when WSL is detected', () => {
       assert.strictEqual(
         toBashPath('E:\\workspace\\hooks\\observe.sh', 'win32', { WSLENV: 'HOME/u' }),
+        '/mnt/e/workspace/hooks/observe.sh'
+      );
+    })
+  )
+    passed++;
+  else failed++;
+
+  if (
+    test('toBashPath uses WSL /mnt drive mounts when WSL_DISTRO_NAME is set', () => {
+      assert.strictEqual(
+        toBashPath('E:\\workspace\\hooks\\observe.sh', 'win32', { WSL_DISTRO_NAME: 'Ubuntu' }),
         '/mnt/e/workspace/hooks/observe.sh'
       );
     })
@@ -2327,11 +2473,11 @@ async function runTests() {
   if (
     await asyncTest('detect-project exports the resolved Python command for downstream scripts', async () => {
       const detectProjectPath = path.join(__dirname, '..', '..', 'skills', 'continuous-learning-v2', 'scripts', 'detect-project.sh');
-      const shellCommand = [`source "${toBashPath(detectProjectPath)}" >/dev/null 2>&1`, 'printf "%s\\n" "${CLV2_PYTHON_CMD:-}"'].join('; ');
+      const shellCommand = [`source "${toBashPath(detectProjectPath)}" >/dev/null 2>&1`, 'declare -p CLV2_PYTHON_CMD 2>/dev/null'].join('; ');
 
       const shell = process.platform === 'win32' ? 'bash' : 'bash';
       const proc = spawn(shell, ['-lc', shellCommand], {
-        env: process.env,
+        env: toBashEnv(process.env),
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
@@ -2346,7 +2492,7 @@ async function runTests() {
       });
 
       assert.strictEqual(code, 0, `detect-project.sh should source cleanly, stderr: ${stderr}`);
-      assert.ok(stdout.trim().length > 0, 'CLV2_PYTHON_CMD should export a resolved interpreter path');
+      assert.match(stdout, /declare -x CLV2_PYTHON_CMD=".+"/, 'CLV2_PYTHON_CMD should export a resolved interpreter path');
     })
   )
     passed++;
@@ -2358,6 +2504,7 @@ async function runTests() {
       const homeDir = path.join(testRoot, 'home');
       const repoDir = path.join(testRoot, 'repo');
       const detectProjectPath = path.join(__dirname, '..', '..', 'skills', 'continuous-learning-v2', 'scripts', 'detect-project.sh');
+      const homunculusDir = path.join(homeDir, '.claude', 'homunculus');
 
       try {
         fs.mkdirSync(homeDir, { recursive: true });
@@ -2366,14 +2513,18 @@ async function runTests() {
         spawnSync('git', ['remote', 'add', 'origin', 'https://github.com/example/ecc-test.git'], { cwd: repoDir, stdio: 'ignore' });
 
         const shellCommand = [
+          ...buildBashExports({
+            HOME: homeDir,
+            USERPROFILE: homeDir,
+            CLV2_HOMUNCULUS_DIR: homunculusDir
+          }),
           `cd "${toBashPath(repoDir)}"`,
           `source "${toBashPath(detectProjectPath)}" >/dev/null 2>&1`,
-          'printf "%s\\n" "$PROJECT_ID"',
-          'printf "%s\\n" "$PROJECT_DIR"'
+          'declare -p PROJECT_ID PROJECT_DIR 2>/dev/null'
         ].join('; ');
 
         const proc = spawn('bash', ['-lc', shellCommand], {
-          env: { ...process.env, HOME: homeDir, USERPROFILE: homeDir },
+          env: process.env,
           stdio: ['ignore', 'pipe', 'pipe']
         });
 
@@ -2389,8 +2540,11 @@ async function runTests() {
 
         assert.strictEqual(code, 0, `detect-project should source cleanly, stderr: ${stderr}`);
 
-        const [projectId, projectDir] = stdout.trim().split(/\r?\n/);
-        const registryPath = path.join(homeDir, '.claude', 'homunculus', 'projects.json');
+        const projectIdMatch = stdout.match(/declare -- PROJECT_ID="([^"]+)"/);
+        const projectDirMatch = stdout.match(/declare -- PROJECT_DIR="([^"]+)"/);
+        const projectId = projectIdMatch?.[1];
+        const projectDir = projectDirMatch ? toNativePath(projectDirMatch[1]) : projectDirMatch?.[1];
+        const registryPath = path.join(homunculusDir, 'projects.json');
         const projectMetadataPath = path.join(projectDir, 'project.json');
 
         assert.ok(projectId, 'detect-project should emit a project id');
@@ -2403,7 +2557,7 @@ async function runTests() {
         assert.ok(registry[projectId], 'registry should contain the detected project');
         assert.strictEqual(metadata.id, projectId, 'project.json should include the detected id');
         assert.strictEqual(metadata.name, path.basename(repoDir), 'project.json should include the repo name');
-        assert.strictEqual(fs.realpathSync(metadata.root), fs.realpathSync(repoDir), 'project.json should include the repo root');
+        assert.strictEqual(fs.realpathSync(toNativePath(metadata.root)), fs.realpathSync(repoDir), 'project.json should include the repo root');
         assert.strictEqual(metadata.remote, 'https://github.com/example/ecc-test.git', 'project.json should include the sanitized remote');
         assert.ok(metadata.created_at, 'project.json should include created_at');
         assert.ok(metadata.last_seen, 'project.json should include last_seen');
@@ -2432,7 +2586,8 @@ async function runTests() {
       const result = await runShellScript(observePath, ['post'], payload, {
         HOME: homeDir,
         USERPROFILE: homeDir,
-        CLAUDE_PROJECT_DIR: projectDir
+        CLAUDE_PROJECT_DIR: projectDir,
+        CLV2_HOMUNCULUS_DIR: toBashPath(path.join(homeDir, '.claude', 'homunculus'))
       }, projectDir);
 
       assert.strictEqual(result.code, 0, `observe.sh should exit successfully, stderr: ${result.stderr}`);
