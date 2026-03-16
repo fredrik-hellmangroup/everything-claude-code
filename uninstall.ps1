@@ -53,5 +53,15 @@ $scriptPath = Resolve-LinkedScriptPath -InitialPath $PSCommandPath
 $scriptDir = Split-Path -Parent $scriptPath
 $uninstallerScript = Join-Path -Path (Join-Path -Path $scriptDir -ChildPath 'scripts') -ChildPath 'uninstall.js'
 
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Error 'Node.js was not found in PATH. Please install Node.js and try again.'
+    exit 1
+}
+
+if (-not (Test-Path -LiteralPath $uninstallerScript)) {
+    Write-Error "Uninstaller script not found: $uninstallerScript"
+    exit 1
+}
+
 & node $uninstallerScript @args
 exit $LASTEXITCODE

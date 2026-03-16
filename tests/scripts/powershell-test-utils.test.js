@@ -6,6 +6,7 @@ const assert = require('assert');
 
 const {
   getPowerShellCandidates,
+  resolveExecutablePath,
   resolvePowerShellCommand,
 } = require('./powershell-test-utils');
 
@@ -54,6 +55,27 @@ function runTests() {
   if (test('returns null when no candidate succeeds', () => {
     const fakeSpawn = () => ({ error: new Error('not found'), status: 1 });
     assert.strictEqual(resolvePowerShellCommand('win32', fakeSpawn), null);
+  })) passed++; else failed++;
+
+  if (test('returns the first resolved executable path from locator output', () => {
+    const fakeExecFile = () => 'C:\\Program Files\\PowerShell\\7\\pwsh.exe\r\nC:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\n';
+    assert.strictEqual(
+      resolveExecutablePath('pwsh', 'win32', fakeExecFile),
+      'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+    );
+  })) passed++; else failed++;
+
+  if (test('throws a descriptive error when the locator cannot resolve a path', () => {
+    const fakeExecFile = () => {
+      const error = new Error('command not found');
+      error.stderr = 'INFO: Could not find files for the given pattern.';
+      throw error;
+    };
+
+    assert.throws(
+      () => resolveExecutablePath('pwsh', 'win32', fakeExecFile),
+      /Failed to resolve executable path for "pwsh" using where\.exe: INFO: Could not find files for the given pattern\./
+    );
   })) passed++; else failed++;
 
   console.log(`\nResults: Passed: ${passed}, Failed: ${failed}`);

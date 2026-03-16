@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const { resolvePowerShellCommand } = require('./powershell-test-utils');
+const { resolveExecutablePath, resolvePowerShellCommand } = require('./powershell-test-utils');
 
 const SCRIPT = path.join(__dirname, '..', '..', 'install.ps1');
 const PACKAGE_JSON = path.join(__dirname, '..', '..', 'package.json');
@@ -19,20 +19,6 @@ function createTempDir(prefix) {
 
 function cleanup(dirPath) {
   fs.rmSync(dirPath, { recursive: true, force: true });
-}
-
-function resolveExecutablePath(command) {
-  const locator = process.platform === 'win32' ? 'where.exe' : 'which';
-  const output = execFileSync(locator, [command], {
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    timeout: 5000,
-  });
-
-  return output
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .find(Boolean);
 }
 
 function run(powerShellCommand, args = [], options = {}) {
