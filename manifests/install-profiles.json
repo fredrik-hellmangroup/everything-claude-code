@@ -73,6 +73,11 @@
         "social-distribution",
         "media-generation",
         "orchestration",
+        "swift-apple",
+        "agentic-patterns",
+        "devops-infra",
+        "supply-chain-domain",
+        "document-processing"
         "copilot-runtime"
       ]
     }
