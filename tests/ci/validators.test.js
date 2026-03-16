@@ -2365,6 +2365,68 @@ function runTests() {
     cleanupTestDir(testDir);
   })) passed++; else failed++;
 
+  if (test('allows path sharing when install modules target different harnesses', () => {
+    const testDir = createTestDir();
+    writeJson(path.join(testDir, 'manifests', 'install-modules.json'), {
+      version: 1,
+      modules: [
+        {
+          id: 'agents-core',
+          kind: 'agents',
+          description: 'Agents',
+          paths: ['AGENTS.md'],
+          targets: ['claude'],
+          dependencies: [],
+          defaultInstall: true,
+          cost: 'light',
+          stability: 'stable'
+        },
+        {
+          id: 'copilot-runtime',
+          kind: 'platform',
+          description: 'Copilot runtime',
+          paths: ['AGENTS.md'],
+          targets: ['copilot'],
+          dependencies: [],
+          defaultInstall: true,
+          cost: 'light',
+          stability: 'stable'
+        }
+      ]
+    });
+    writeJson(path.join(testDir, 'manifests', 'install-profiles.json'), {
+      version: 1,
+      profiles: {
+        core: { description: 'Core', modules: ['agents-core', 'copilot-runtime'] },
+        developer: { description: 'Developer', modules: ['agents-core', 'copilot-runtime'] },
+        security: { description: 'Security', modules: ['agents-core', 'copilot-runtime'] },
+        research: { description: 'Research', modules: ['agents-core', 'copilot-runtime'] },
+        full: { description: 'Full', modules: ['agents-core', 'copilot-runtime'] }
+      }
+    });
+    writeInstallComponentsManifest(testDir, [
+      {
+        id: 'baseline:agents',
+        family: 'baseline',
+        description: 'Agents',
+        modules: ['agents-core']
+      }
+    ]);
+    fs.writeFileSync(path.join(testDir, 'AGENTS.md'), '# Shared agents\n');
+
+    const result = runValidatorWithDirs('validate-install-manifests', {
+      REPO_ROOT: testDir,
+      MODULES_MANIFEST_PATH: path.join(testDir, 'manifests', 'install-modules.json'),
+      PROFILES_MANIFEST_PATH: path.join(testDir, 'manifests', 'install-profiles.json'),
+      COMPONENTS_MANIFEST_PATH: path.join(testDir, 'manifests', 'install-components.json'),
+      MODULES_SCHEMA_PATH: modulesSchemaPath,
+      PROFILES_SCHEMA_PATH: profilesSchemaPath,
+      COMPONENTS_SCHEMA_PATH: componentsSchemaPath
+    });
+    assert.strictEqual(result.code, 0, 'Should allow duplicate paths across disjoint targets');
+    cleanupTestDir(testDir);
+  })) passed++; else failed++;
+
   if (test('fails when an install profile references an unknown module', () => {
     const testDir = createTestDir();
     writeJson(path.join(testDir, 'manifests', 'install-modules.json'), {

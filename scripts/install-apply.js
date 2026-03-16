@@ -29,6 +29,9 @@ Targets:
   claude       (default) - Install rules to ~/.claude/rules/
   cursor       - Install rules, hooks, and bundled Cursor configs to ./.cursor/
   antigravity  - Install rules, workflows, skills, and agents to ./.agent/
+  copilot      - Install local Copilot instructions to ~/.copilot/
+  codex        - Install Codex configs and AGENTS supplements to ~/.codex/
+  opencode     - Install OpenCode configs, tools, and instructions to ~/.opencode/
 
 Options:
   --profile <name>    Resolve and install a manifest profile

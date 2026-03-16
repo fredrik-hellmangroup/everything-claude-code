@@ -90,6 +90,18 @@ function runTests() {
     assert.ok(result.stdout.includes('security'));
   })) passed++; else failed++;
 
+  if (test('prints a copilot plan with the generated local instruction target', () => {
+    const result = run([
+      '--profile', 'core',
+      '--target', 'copilot'
+    ]);
+    assert.strictEqual(result.code, 0);
+    assert.ok(result.stdout.includes('Adapter: copilot-home'));
+    assert.ok(result.stdout.includes('Target: copilot'));
+    assert.ok(result.stdout.includes('copilot-runtime'));
+    assert.ok(result.stdout.includes('copilot-instructions.md'));
+  })) passed++; else failed++;
+
   if (test('emits JSON for explicit module resolution', () => {
     const result = run([
       '--modules', 'security',

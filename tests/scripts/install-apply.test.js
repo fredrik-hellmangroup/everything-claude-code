@@ -73,6 +73,7 @@ function runTests() {
     assert.ok(result.stdout.includes('--dry-run'));
     assert.ok(result.stdout.includes('--profile <name>'));
     assert.ok(result.stdout.includes('--modules <id,id,...>'));
+    assert.ok(result.stdout.includes('copilot'));
   })) passed++; else failed++;
 
   if (test('rejects mixing legacy languages with manifest profile flags', () => {
@@ -307,6 +308,51 @@ function runTests() {
         !state.operations.some(operation => operation.destinationPath.endsWith('ecc-install-state.json')),
         'Manifest copy operations should not include generated install-state files'
       );
+    } finally {
+      cleanup(homeDir);
+      cleanup(projectDir);
+    }
+  })) passed++; else failed++;
+
+  if (test('installs Copilot local instructions and writes install-state', () => {
+    const homeDir = createTempDir('install-apply-home-');
+    const projectDir = createTempDir('install-apply-project-');
+
+    try {
+      const result = run(['--target', 'copilot', 'typescript'], { cwd: projectDir, homeDir });
+      assert.strictEqual(result.code, 0, result.stderr);
+
+      const copilotRoot = path.join(homeDir, '.copilot');
+      assert.ok(fs.existsSync(path.join(copilotRoot, 'copilot-instructions.md')));
+      assert.ok(fs.existsSync(path.join(copilotRoot, 'AGENTS.md')));
+      assert.ok(fs.existsSync(path.join(copilotRoot, 'skills', 'everything-copilot-code', 'INSTRUCTION.md')));
+      assert.ok(!fs.existsSync(path.join(copilotRoot, 'rules')));
+      assert.ok(!fs.existsSync(path.join(copilotRoot, 'agents')));
+
+      const statePath = path.join(copilotRoot, 'ecc', 'install-state.json');
+      const state = readJson(statePath);
+      assert.strictEqual(state.target.id, 'copilot-home');
+      assert.deepStrictEqual(state.request.legacyLanguages, ['typescript']);
+      assert.strictEqual(state.request.legacyMode, true);
+      assert.deepStrictEqual(state.resolution.selectedModules, ['copilot-runtime']);
+      assert.ok(
+        state.operations.some(operation => (
+          operation.kind === 'render-template'
+          && operation.destinationPath === path.join(copilotRoot, 'copilot-instructions.md')
+        )),
+        'Should record the generated copilot-instructions operation'
+      );
+
+      const installedInstructions = fs.readFileSync(
+        path.join(copilotRoot, 'copilot-instructions.md'),
+        'utf8'
+      );
+      assert.ok(installedInstructions.includes('# Everything Copilot Code'));
+      assert.ok(installedInstructions.includes('GitHub Copilot'));
+
+      const installedAgents = fs.readFileSync(path.join(copilotRoot, 'AGENTS.md'), 'utf8');
+      assert.ok(installedAgents.includes('# Everything Claude Code (ECC) — Agent Instructions'));
+      assert.ok(installedAgents.includes('GitHub Copilot'));
     } finally {
       cleanup(homeDir);
       cleanup(projectDir);

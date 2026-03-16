@@ -4,7 +4,7 @@ const path = require('path');
 const { planInstallTargetScaffold } = require('./install-targets/registry');
 
 const DEFAULT_REPO_ROOT = path.join(__dirname, '../..');
-const SUPPORTED_INSTALL_TARGETS = ['claude', 'cursor', 'antigravity', 'codex', 'opencode'];
+const SUPPORTED_INSTALL_TARGETS = ['claude', 'cursor', 'antigravity', 'copilot', 'codex', 'opencode'];
 const COMPONENT_FAMILY_PREFIXES = {
   baseline: 'baseline:',
   language: 'lang:',
@@ -32,6 +32,9 @@ const LEGACY_COMPAT_BASE_MODULE_IDS_BY_TARGET = Object.freeze({
     'rules-core',
     'agents-core',
     'commands-core',
+  ],
+  copilot: [
+    'copilot-runtime',
   ],
 });
 const LEGACY_LANGUAGE_ALIAS_TO_CANONICAL = Object.freeze({
@@ -261,7 +264,7 @@ function resolveLegacyCompatibilitySelection(options = {}) {
     || LEGACY_COMPAT_BASE_MODULE_IDS_BY_TARGET.claude;
   const moduleIds = dedupeStrings([
     ...baseModuleIds,
-    ...(target === 'antigravity'
+    ...(target === 'antigravity' || target === 'copilot'
       ? []
       : canonicalLegacyLanguages.flatMap(language => LEGACY_LANGUAGE_EXTRA_MODULE_IDS[language] || [])),
   ]);

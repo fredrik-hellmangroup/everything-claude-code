@@ -9,7 +9,8 @@
         "commands-core",
         "hooks-runtime",
         "platform-configs",
-        "workflow-quality"
+        "workflow-quality",
+        "copilot-runtime"
       ]
     },
     "developer": {
@@ -23,7 +24,8 @@
         "workflow-quality",
         "framework-language",
         "database",
-        "orchestration"
+        "orchestration",
+        "copilot-runtime"
       ]
     },
     "security": {
@@ -35,7 +37,8 @@
         "hooks-runtime",
         "platform-configs",
         "workflow-quality",
-        "security"
+        "security",
+        "copilot-runtime"
       ]
     },
     "research": {
@@ -49,7 +52,8 @@
         "workflow-quality",
         "research-apis",
         "business-content",
-        "social-distribution"
+        "social-distribution",
+        "copilot-runtime"
       ]
     },
     "full": {
@@ -68,7 +72,8 @@
         "business-content",
         "social-distribution",
         "media-generation",
-        "orchestration"
+        "orchestration",
+        "copilot-runtime"
       ]
     }
   }

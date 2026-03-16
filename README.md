@@ -35,7 +35,7 @@
 
 Not just configs. A complete system: skills, instincts, memory optimization, continuous learning, security scanning, and research-first development. Production-ready agents, hooks, commands, rules, and MCP configurations evolved over 10+ months of intensive daily use building real products.
 
-Works across **Claude Code**, **Codex**, **Cowork**, and other AI agent harnesses.
+Works across **Claude Code**, **GitHub Copilot**, **Codex**, **Cowork**, and other AI agent harnesses.
 
 ---
 
@@ -160,6 +160,7 @@ cd everything-claude-code
 # ./install.sh typescript python golang swift php
 # ./install.sh --target cursor typescript
 # ./install.sh --target antigravity typescript
+# ./install.sh --target copilot typescript
 ```
 
 ```powershell
@@ -168,12 +169,13 @@ cd everything-claude-code
 # .\install.ps1 typescript python golang swift php
 # .\install.ps1 --target cursor typescript
 # .\install.ps1 --target antigravity typescript
+# .\install.ps1 --target copilot typescript
 
 # npm-installed compatibility entrypoint also works cross-platform
 npx ecc-install typescript
 ```
 
-For manual install instructions see the README in the `rules/` folder.
+For manual install instructions see the README in the `rules/` folder. Use `--target copilot` to install ECC's local GitHub Copilot instructions into `~/.copilot/`.
 
 ### Step 3: Start Using
 
@@ -194,7 +196,7 @@ For manual install instructions see the README in the `rules/` folder.
 
 ## 🌐 Cross-Platform Support
 
-This plugin now fully supports **Windows, macOS, and Linux**, alongside tight integration across major IDEs (Cursor, OpenCode, Antigravity) and CLI harnesses. All hooks and scripts have been rewritten in Node.js for maximum compatibility.
+This plugin now fully supports **Windows, macOS, and Linux**, alongside tight integration across major IDEs and harnesses including **Cursor**, **OpenCode**, **Antigravity**, **Codex**, and **GitHub Copilot**. All hooks and scripts have been rewritten in Node.js for maximum compatibility.
 
 ### Package Manager Detection
 

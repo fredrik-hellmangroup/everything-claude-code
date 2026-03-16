@@ -2,6 +2,23 @@
   "version": 1,
   "modules": [
     {
+      "id": "copilot-runtime",
+      "kind": "platform",
+      "description": "Local GitHub Copilot instruction generation inputs and Copilot-specific supplements.",
+      "paths": [
+        "AGENTS.md",
+        "AGENTS.copilot.md",
+        ".claude/skills/everything-claude-code/SKILL.md"
+      ],
+      "targets": [
+        "copilot"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
       "id": "rules-core",
       "kind": "rules",
       "description": "Shared and language rules for supported harness targets.",

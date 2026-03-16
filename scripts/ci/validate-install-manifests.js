@@ -33,6 +33,12 @@ function normalizeRelativePath(relativePath) {
   return String(relativePath).replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
+function haveOverlappingTargets(leftTargets, rightTargets) {
+  const left = new Set(Array.isArray(leftTargets) ? leftTargets : []);
+  const right = Array.isArray(rightTargets) ? rightTargets : [];
+  return right.some(target => left.has(target));
+}
+
 function validateSchema(ajv, schemaPath, data, label) {
   const schema = readJson(schemaPath, `${label} schema`);
   const validate = ajv.compile(schema);
@@ -117,12 +123,18 @@ function validateInstallManifests() {
       }
 
       if (claimedPaths.has(normalizedPath)) {
+        const existingClaim = claimedPaths.get(normalizedPath);
         console.error(
-          `ERROR: Install path ${normalizedPath} is claimed by both ${claimedPaths.get(normalizedPath)} and ${module.id}`
+          haveOverlappingTargets(existingClaim.targets, module.targets)
+            ? `ERROR: Install path ${normalizedPath} is claimed by both ${existingClaim.moduleId} and ${module.id}`
+            : `WARN: Install path ${normalizedPath} is shared by target-disjoint modules ${existingClaim.moduleId} and ${module.id}`
         );
-        hasErrors = true;
+        hasErrors = haveOverlappingTargets(existingClaim.targets, module.targets) || hasErrors;
       } else {
-        claimedPaths.set(normalizedPath, module.id);
+        claimedPaths.set(normalizedPath, {
+          moduleId: module.id,
+          targets: Array.isArray(module.targets) ? module.targets : [],
+        });
       }
     }
   }

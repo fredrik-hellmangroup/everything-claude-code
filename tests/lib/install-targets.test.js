@@ -41,6 +41,7 @@ function runTests() {
     assert.ok(targets.includes('antigravity'), 'Should include antigravity target');
     assert.ok(targets.includes('codex'), 'Should include codex target');
     assert.ok(targets.includes('opencode'), 'Should include opencode target');
+    assert.ok(targets.includes('copilot'), 'Should include copilot target');
   })) passed++; else failed++;
 
   if (test('resolves cursor adapter root and install-state path from project root', () => {
@@ -61,6 +62,16 @@ function runTests() {
 
     assert.strictEqual(root, path.join(homeDir, '.claude'));
     assert.strictEqual(statePath, path.join(homeDir, '.claude', 'ecc', 'install-state.json'));
+  })) passed++; else failed++;
+
+  if (test('resolves copilot adapter root and install-state path from home dir', () => {
+    const adapter = getInstallTargetAdapter('copilot');
+    const homeDir = '/Users/example';
+    const root = adapter.resolveRoot({ homeDir, repoRoot: '/repo/ecc' });
+    const statePath = adapter.getInstallStatePath({ homeDir, repoRoot: '/repo/ecc' });
+
+    assert.strictEqual(root, path.join(homeDir, '.copilot'));
+    assert.strictEqual(statePath, path.join(homeDir, '.copilot', 'ecc', 'install-state.json'));
   })) passed++; else failed++;
 
   if (test('plans scaffold operations and flattens native target roots', () => {
@@ -187,6 +198,54 @@ function runTests() {
         && operation.destinationPath === path.join(projectRoot, '.agent', 'rules', 'common-coding-style.md')
       )),
       'Should flatten common rules for antigravity'
+    );
+  })) passed++; else failed++;
+
+  if (test('plans copilot generated instruction outputs under the home directory', () => {
+    const repoRoot = path.join(__dirname, '..', '..');
+    const homeDir = '/Users/example';
+
+    const plan = planInstallTargetScaffold({
+      target: 'copilot',
+      repoRoot,
+      homeDir,
+      modules: [
+        {
+          id: 'copilot-runtime',
+          paths: ['AGENTS.copilot.md', '.claude/skills/everything-claude-code/SKILL.md'],
+        },
+      ],
+    });
+
+    assert.strictEqual(plan.adapter.id, 'copilot-home');
+    assert.strictEqual(plan.targetRoot, path.join(homeDir, '.copilot'));
+    assert.strictEqual(plan.installStatePath, path.join(homeDir, '.copilot', 'ecc', 'install-state.json'));
+    assert.ok(
+      plan.operations.some(operation => (
+        operation.kind === 'render-template'
+        && operation.destinationPath === path.join(homeDir, '.copilot', 'copilot-instructions.md')
+      )),
+      'Should generate the local copilot-instructions.md file'
+    );
+    assert.ok(
+      plan.operations.some(operation => (
+        operation.kind === 'render-template'
+        && operation.destinationPath === path.join(homeDir, '.copilot', 'AGENTS.md')
+      )),
+      'Should generate a merged Copilot AGENTS.md supplement'
+    );
+    assert.ok(
+      plan.operations.some(operation => (
+        operation.kind === 'render-template'
+        && operation.destinationPath === path.join(
+          homeDir,
+          '.copilot',
+          'skills',
+          'everything-copilot-code',
+          'INSTRUCTION.md'
+        )
+      )),
+      'Should generate the ECC-owned Copilot instruction artifact'
     );
   })) passed++; else failed++;
 

@@ -460,6 +460,14 @@ function createLegacyInstallPlan(options = {}) {
     plan = planClaudeLegacyInstall(context);
   } else if (target === 'cursor') {
     plan = planCursorLegacyInstall(context);
+  } else if (target === 'copilot') {
+    return createLegacyCompatInstallPlan({
+      sourceRoot,
+      projectRoot,
+      homeDir,
+      target,
+      legacyLanguages: context.languages,
+    });
   } else {
     plan = planAntigravityLegacyInstall(context);
   }
@@ -539,6 +547,10 @@ function createLegacyCompatInstallPlan(options = {}) {
 }
 
 function materializeScaffoldOperation(sourceRoot, operation) {
+  if (!operation.scaffoldOnly) {
+    return [{ ...operation }];
+  }
+
   const sourcePath = path.join(sourceRoot, operation.sourceRelativePath);
   if (!fs.existsSync(sourcePath)) {
     return [];

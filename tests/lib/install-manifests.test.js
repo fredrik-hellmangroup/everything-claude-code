@@ -68,6 +68,11 @@ function runTests() {
     const modules = listInstallModules();
     assert.ok(modules.some(module => module.id === 'rules-core'), 'Should include rules-core');
     assert.ok(modules.some(module => module.id === 'orchestration'), 'Should include orchestration');
+    const manifests = loadInstallManifests();
+    const copilotRuntime = manifests.modulesById.get('copilot-runtime');
+    assert.ok(copilotRuntime, 'Should include copilot-runtime');
+    assert.ok(copilotRuntime.paths.includes('AGENTS.md'),
+      'copilot-runtime should declare AGENTS.md as an input');
   })) passed++; else failed++;
 
   if (test('lists install components from the real project', () => {
@@ -107,6 +112,27 @@ function runTests() {
       )),
       'Should flatten the native cursor root'
     );
+  })) passed++; else failed++;
+
+  if (test('resolves the copilot target to a local-only runtime module', () => {
+    const homeDir = '/Users/example';
+    const plan = resolveInstallPlan({
+      profileId: 'core',
+      target: 'copilot',
+      homeDir,
+    });
+
+    assert.deepStrictEqual(plan.selectedModuleIds, ['copilot-runtime']);
+    assert.ok(plan.skippedModuleIds.includes('rules-core'));
+    assert.ok(plan.skippedModuleIds.includes('agents-core'));
+    assert.ok(plan.skippedModuleIds.includes('commands-core'));
+    assert.ok(plan.skippedModuleIds.includes('hooks-runtime'));
+    assert.ok(plan.skippedModuleIds.includes('platform-configs'));
+    assert.ok(plan.skippedModuleIds.includes('workflow-quality'));
+    assert.strictEqual(plan.targetAdapterId, 'copilot-home');
+    assert.strictEqual(plan.targetRoot, path.join(homeDir, '.copilot'));
+    assert.strictEqual(plan.installStatePath, path.join(homeDir, '.copilot', 'ecc', 'install-state.json'));
+    assert.ok(plan.operations.length > 0, 'Should include generated Copilot operations');
   })) passed++; else failed++;
 
   if (test('resolves antigravity profiles by skipping incompatible dependency trees', () => {
@@ -162,6 +188,16 @@ function runTests() {
     });
 
     assert.deepStrictEqual(selection.moduleIds, ['rules-core', 'agents-core', 'commands-core']);
+  })) passed++; else failed++;
+
+  if (test('maps copilot legacy compatibility installs onto the copilot runtime module', () => {
+    const selection = resolveLegacyCompatibilitySelection({
+      target: 'copilot',
+      legacyLanguages: ['typescript'],
+    });
+
+    assert.deepStrictEqual(selection.legacyLanguages, ['typescript']);
+    assert.deepStrictEqual(selection.moduleIds, ['copilot-runtime']);
   })) passed++; else failed++;
 
   if (test('rejects unknown legacy compatibility languages', () => {
