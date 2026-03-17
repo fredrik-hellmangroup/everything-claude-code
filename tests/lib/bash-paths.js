@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const { spawnSync } = require('child_process');
 
 const bashPathCache = new Map();
@@ -31,16 +32,29 @@ function fallbackToBashPath(filePath) {
 
 function fallbackFromBashPath(filePath) {
   const normalized = String(filePath);
-  const match =
-    normalized.match(/^\/(?:mnt|cygdrive)\/([a-z])(?:\/(.*))?$/i) ||
-    normalized.match(/^\/([a-z])(?:\/(.*))?$/i);
+  const prefixedMatch = normalized.match(/^\/(?:mnt|cygdrive)\/([a-z])(?:\/(.*))?$/i);
 
-  if (!match || normalized.startsWith('//')) {
+  if (normalized.startsWith('//')) {
     return filePath;
   }
 
-  const [, driveLetter, remainder = ''] = match;
-  return `${driveLetter.toUpperCase()}:\\${remainder.replace(/\//g, '\\')}`;
+  if (prefixedMatch) {
+    const [, driveLetter, remainder = ''] = prefixedMatch;
+    return `${driveLetter.toUpperCase()}:\\${remainder.replace(/\//g, '\\')}`;
+  }
+
+  const bareDriveMatch = normalized.match(/^\/([a-z])(?:\/(.*))?$/i);
+  if (!bareDriveMatch) {
+    return filePath;
+  }
+
+  const [, driveLetter, remainder = ''] = bareDriveMatch;
+  const driveRoot = `${driveLetter.toUpperCase()}:\\`;
+  if (!fs.existsSync(driveRoot)) {
+    return filePath;
+  }
+
+  return `${driveRoot}${remainder.replace(/\//g, '\\')}`;
 }
 
 function toBashPath(filePath) {

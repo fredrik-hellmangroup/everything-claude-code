@@ -133,6 +133,11 @@ function cleanupTestDir(testDir) {
   }
 }
 
+function canonicalizeExistingPath(targetPath) {
+  const realpath = typeof fs.realpathSync.native === 'function' ? fs.realpathSync.native(targetPath) : fs.realpathSync(targetPath);
+  return process.platform === 'win32' ? realpath.toLowerCase() : realpath;
+}
+
 function createCommandShim(binDir, baseName, logFile) {
   fs.mkdirSync(binDir, { recursive: true });
 
@@ -1095,7 +1100,11 @@ async function runTests() {
       assert.strictEqual(result.code, 0, 'Should exit 0 for config-only repo');
       const logEntries = readCommandLog(logFile);
       assert.strictEqual(logEntries.length, 1, 'Should invoke formatter once');
-      assert.strictEqual(fs.realpathSync(logEntries[0].cwd), fs.realpathSync(rootDir), 'Should run formatter from config root');
+      assert.strictEqual(
+        canonicalizeExistingPath(logEntries[0].cwd),
+        canonicalizeExistingPath(rootDir),
+        'Should run formatter from config root'
+      );
       assert.deepStrictEqual(logEntries[0].args, ['prettier', '--write', filePath], 'Should use the formatter on the nested file');
       cleanupTestDir(testDir);
     })
@@ -2372,7 +2381,11 @@ async function runTests() {
         assert.ok(registry[projectId], 'registry should contain the detected project');
         assert.strictEqual(metadata.id, projectId, 'project.json should include the detected id');
         assert.strictEqual(metadata.name, path.basename(repoDir), 'project.json should include the repo name');
-        assert.strictEqual(fs.realpathSync(fromBashPath(metadata.root)), fs.realpathSync(repoDir), 'project.json should include the repo root');
+        assert.strictEqual(
+          canonicalizeExistingPath(fromBashPath(metadata.root)),
+          canonicalizeExistingPath(repoDir),
+          'project.json should include the repo root'
+        );
         assert.strictEqual(metadata.remote, 'https://github.com/example/ecc-test.git', 'project.json should include the sanitized remote');
         assert.ok(metadata.created_at, 'project.json should include created_at');
         assert.ok(metadata.last_seen, 'project.json should include last_seen');
